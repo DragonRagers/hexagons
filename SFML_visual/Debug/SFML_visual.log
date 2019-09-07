@@ -1,0 +1,37 @@
+﻿  main.cpp
+C:\Users\Connor\Desktop\SFML_enviroment\SFML_visual\SFML_visual\main.cpp(18,43): warning C4305:  'initializing': truncation from 'double' to 'const float'
+C:\Users\Connor\Desktop\SFML_enviroment\SFML_visual\SFML_visual\main.cpp(24,22): warning C4244:  'argument': conversion from 'int' to 'float', possible loss of data
+C:\Users\Connor\Desktop\SFML_enviroment\SFML_visual\SFML_visual\main.cpp(27,26): warning C4244:  'argument': conversion from 'int' to 'float', possible loss of data
+C:\Users\Connor\Desktop\SFML_enviroment\SFML_visual\SFML_visual\main.cpp(28,21): warning C4244:  'argument': conversion from 'int' to 'float', possible loss of data
+C:\Users\Connor\Desktop\SFML_enviroment\SFML_visual\SFML_visual\main.cpp(28,18): warning C4244:  'argument': conversion from 'int' to 'float', possible loss of data
+C:\Users\Connor\Desktop\SFML_enviroment\SFML_visual\SFML_visual\main.cpp(29,24): warning C4244:  'argument': conversion from 'int' to 'float', possible loss of data
+C:\Users\Connor\Desktop\SFML_enviroment\SFML_visual\SFML_visual\main.cpp(29,16): warning C4244:  'argument': conversion from 'int' to 'float', possible loss of data
+C:\Users\Connor\Desktop\SFML_enviroment\SFML_visual\SFML_visual\main.cpp(34,23): warning C4244:  'initializing': conversion from 'double' to 'int', possible loss of data
+C:\Users\Connor\Desktop\SFML_enviroment\SFML_visual\SFML_visual\main.cpp(37,16): warning C4244:  'initializing': conversion from 'double' to 'int', possible loss of data
+C:\Users\Connor\Desktop\SFML_enviroment\SFML_visual\SFML_visual\main.cpp(38,16): warning C4244:  'initializing': conversion from 'double' to 'int', possible loss of data
+C:\Users\Connor\Desktop\SFML_enviroment\SFML_visual\SFML_visual\main.cpp(45,26): warning C4244:  '=': conversion from 'double' to 'int', possible loss of data
+C:\Users\Connor\Desktop\SFML_enviroment\SFML_visual\SFML_visual\main.cpp(56,39): warning C4244:  '+=': conversion from 'double' to 'int', possible loss of data
+C:\Users\Connor\Desktop\SFML_enviroment\SFML_visual\SFML_visual\main.cpp(59,46): warning C4244:  '+=': conversion from 'double' to 'int', possible loss of data
+C:\Users\Connor\Desktop\SFML_enviroment\SFML_visual\SFML_visual\main.cpp(107,73): warning C4244:  'argument': conversion from 'const T' to 'int', possible loss of data
+C:\Users\Connor\Desktop\SFML_enviroment\SFML_visual\SFML_visual\main.cpp(107,73): warning C4244:         with
+C:\Users\Connor\Desktop\SFML_enviroment\SFML_visual\SFML_visual\main.cpp(107,73): warning C4244:         [
+C:\Users\Connor\Desktop\SFML_enviroment\SFML_visual\SFML_visual\main.cpp(107,73): warning C4244:             T=float
+C:\Users\Connor\Desktop\SFML_enviroment\SFML_visual\SFML_visual\main.cpp(107,73): warning C4244:         ]
+C:\Users\Connor\Desktop\SFML_enviroment\SFML_visual\SFML_visual\main.cpp(107,50): warning C4244:  'argument': conversion from 'const T' to 'int', possible loss of data
+C:\Users\Connor\Desktop\SFML_enviroment\SFML_visual\SFML_visual\main.cpp(107,50): warning C4244:         with
+C:\Users\Connor\Desktop\SFML_enviroment\SFML_visual\SFML_visual\main.cpp(107,50): warning C4244:         [
+C:\Users\Connor\Desktop\SFML_enviroment\SFML_visual\SFML_visual\main.cpp(107,50): warning C4244:             T=float
+C:\Users\Connor\Desktop\SFML_enviroment\SFML_visual\SFML_visual\main.cpp(107,50): warning C4244:         ]
+C:\Users\Connor\Desktop\SFML_enviroment\SFML_visual\SFML_visual\main.cpp(112,22): warning C4018:  '<': signed/unsigned mismatch
+C:\Users\Connor\Desktop\SFML_enviroment\SFML_visual\SFML_visual\main.cpp(150,21): warning C4018:  '<': signed/unsigned mismatch
+C:\Users\Connor\Desktop\SFML_enviroment\SFML_visual\SFML_visual\main.cpp(152,10): warning C4244:  'initializing': conversion from 'const T' to 'int', possible loss of data
+C:\Users\Connor\Desktop\SFML_enviroment\SFML_visual\SFML_visual\main.cpp(152,10): warning C4244:         with
+C:\Users\Connor\Desktop\SFML_enviroment\SFML_visual\SFML_visual\main.cpp(152,10): warning C4244:         [
+C:\Users\Connor\Desktop\SFML_enviroment\SFML_visual\SFML_visual\main.cpp(152,10): warning C4244:             T=float
+C:\Users\Connor\Desktop\SFML_enviroment\SFML_visual\SFML_visual\main.cpp(152,10): warning C4244:         ]
+C:\Users\Connor\Desktop\SFML_enviroment\SFML_visual\SFML_visual\main.cpp(153,10): warning C4244:  'initializing': conversion from 'const T' to 'int', possible loss of data
+C:\Users\Connor\Desktop\SFML_enviroment\SFML_visual\SFML_visual\main.cpp(153,10): warning C4244:         with
+C:\Users\Connor\Desktop\SFML_enviroment\SFML_visual\SFML_visual\main.cpp(153,10): warning C4244:         [
+C:\Users\Connor\Desktop\SFML_enviroment\SFML_visual\SFML_visual\main.cpp(153,10): warning C4244:             T=float
+C:\Users\Connor\Desktop\SFML_enviroment\SFML_visual\SFML_visual\main.cpp(153,10): warning C4244:         ]
+  SFML_visual.vcxproj -> C:\Users\Connor\Desktop\SFML_enviroment\SFML_visual\Debug\SFML_visual.exe
