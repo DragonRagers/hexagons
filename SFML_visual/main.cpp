@@ -2,18 +2,26 @@
 #include <iostream>
 #include <math.h>
 #include <vector>
+#include <thread>
+#include <random>
+#include <chrono>
 
 #define PI 3.14159265359
 using namespace std;
 
-const int width =  1920;
-const int height = 1080;
-int originX = width / 2;
-int originY = height / 2;
-const int hexRadius = 25;
+const int numThreads = 1;
+const int width =  1280;
+const int height = 720;
+const int hexRadius = 35;
 const int stepPerMove = 5;
+const int maxNumLights = 200;
 const int spawnRate = 6;
 const int trailLength = 18;
+const int contactRadius = 5;
+
+int originX = width / 2;
+int originY = height / 2;
+
 const float angles[2][3] = { PI / 6, 5 * PI / 6, 9 * PI / 6,
 							7 * PI / 6, 11 * PI / 6, 3 * PI / 6};
 const sf::Color colors[6] = {sf::Color::Red, sf::Color::Blue, sf::Color::Yellow,
@@ -42,7 +50,7 @@ vector<sf::CircleShape> getBackground(int radius) {
 	vector<sf::CircleShape> hexagons(hexPerCol  * hexPerRow);
 	for (int i = 0; i < hexPerCol / 2; i++) {
 		if (i % 2 == 0) {
-			xOffSet = cos(PI / 6) * radius;
+			xOffSet = ceil(cos(PI / 6) * radius);
 		}
 		else {
 			xOffSet = 0;
@@ -53,7 +61,7 @@ vector<sf::CircleShape> getBackground(int radius) {
 			hexagons.push_back(hexagon(radius, originX + xOffSet, originY - yOffSet - backgroundOffSet, backgroundHexColor));
 			hexagons.push_back(hexagon(radius, originX - xOffSet, originY + yOffSet - backgroundOffSet, backgroundHexColor));
 			hexagons.push_back(hexagon(radius, originX - xOffSet, originY - yOffSet - backgroundOffSet, backgroundHexColor));
-			xOffSet += 2 * cos(PI / 6) * radius;
+			xOffSet += ceil(2 * cos(PI / 6) * radius);
 		}
 
 		yOffSet += ceil((1 + sin(PI / 6)) * radius);
@@ -81,15 +89,15 @@ class Light {
 			angleId = rand();
 		}
 
-		void move() {
+		void move(int direction) {
 			if (!moving) {
 				if (parity) {
-					angleId = (angleId + rand() % 2 + 1) % 3;
+					angleId = (angleId + direction % 2 + 1) % 3;
 					angle = angles[0][angleId];
 					parity = false;
 				}
 				else {
-					angleId = (angleId + rand() % 2 + 1) % 3;
+					angleId = (angleId + direction % 2 + 1) % 3;
 					angle = angles[1][angleId];
 					parity = true;
 				}
@@ -119,21 +127,36 @@ class Light {
 
 };
 
+float distance(Light l1, Light l2) {
+	return sqrt(pow(l1.shape.getPosition().x -l2.shape.getPosition().x, 2) + pow(l1.shape.getPosition().y - l2.shape.getPosition().y, 2));
+
+}
+
+std::vector<Light> lights;
+
+void moveLights(int start = 0, int end = lights.size()) {
+	static thread_local mt19937* generator = nullptr;
+	if (!generator) generator = new mt19937(clock());// + this_thread::get_id().hash());
+	std::uniform_int_distribution<int> distribution(0, 1);
+
+	for (int i = start; i < end; i++) {
+		lights[i].move(distribution(*generator));
+	} 
+}
+
 int main() {
-	sf::ContextSettings settings;
-	settings.antialiasingLevel = 8;
-	sf::RenderWindow window(sf::VideoMode(width, height), "Lights", sf::Style::Default, settings);
+	srand(time(NULL));
+
+	sf::RenderWindow window(sf::VideoMode(width, height), "Lights");
 	window.setFramerateLimit(30);
 
 	vector<sf::CircleShape> hexs = getBackground(hexRadius);
-	std::vector<Light> lights;
-	/*
-	for (int i = 0; i < 100; i++) {
-		lights.push_back(Light(3, originX, originY, sf::Color(255, 0, 0)));
-	} */
+
 	int tick = 0;
+	int timeSum = 0;
 
 	while (window.isOpen()) {
+		auto startTime = std::chrono::high_resolution_clock::now();
 		sf::Event event;
 		while (window.pollEvent(event))
 		{
@@ -143,12 +166,31 @@ int main() {
 		window.clear(sf::Color::Black);
 
 		//calculations
-		if (tick % spawnRate == 0 && lights.size() < 150) {
+		//spawn new lights
+		if (tick % spawnRate == 0 && lights.size() < maxNumLights) {
 			lights.push_back(Light(1, originX, originY));
 		}
 
+		//moves lights
+		
+		thread threads[numThreads];
+		int lightsPerThread = floor(lights.size() / numThreads);
+		for (int i = 0; i < numThreads - 1; i++) {
+			threads[i] = thread(moveLights, lightsPerThread* i, lightsPerThread * (i + 1));
+		}
+		threads[numThreads - 1] = thread(moveLights, lightsPerThread * (numThreads - 1), lights.size());
+		for (int i = 0; i < numThreads; i++) {
+			threads[i].join();
+		} 
+		
+		/*
 		for (int i = 0; i < lights.size(); i++) {
-			lights[i].move();
+			lights[i].move(rand());
+		} */
+	
+		//delete lights that go off screen
+		for (int i = 0; i < lights.size(); i++) {
+
 			int x = lights[i].shape.getPosition().x;
 			int y = lights[i].shape.getPosition().y;
 			if (x < -2 * hexRadius ||
@@ -157,23 +199,42 @@ int main() {
 				y > height + 2 * hexRadius) {
 				lights.erase(lights.begin() + i);
 			}
-			
 		}
-		
+
+		//delete lights that come into contact
+		/*
+		for (int i = 0; i < lights.size(); i++) {
+			for (int j = i; j < lights.size(); j++) {
+				if (i != j) {
+					if (distance(lights[i], lights[j]) < contactRadius) {
+						lights.erase(lights.begin() + i);
+						lights.erase(lights.begin() + j - 1);
+					}
+				}
+			}
+		} */
 		
 		//draw
-		for (sf::CircleShape hex : hexs) {
-			window.draw(hex);
-		}
-		for (Light light : lights) {
-			window.draw(light.shape);
-			for (sf::CircleShape trailBit : light.trail) {
-				window.draw(trailBit);
-			}
+		//draws background
+		
+		for (int i = 0; i < hexs.size(); i++) {
+			window.draw(hexs[i]);
+		} 
+
+		//draws lights and their trails
+		for (int i = 0; i < lights.size(); i++) {
+			window.draw(lights[i].shape);
+			for (int j = 0; j < lights[i].trail.size(); j++) {
+				window.draw(lights[i].trail[j]);
+			} 
 		}
 
 		window.display();
 		tick++;
+		std::chrono::duration<double> elapsed = std::chrono::high_resolution_clock::now() - startTime;
+
+		timeSum += round(elapsed.count() * 1000);
+		cout << "\nTick " << tick << ": " << round(elapsed.count() * 1000) << " (ms), Average: " << timeSum / tick << " (ms)";
 	}
 	return 0;
 }
