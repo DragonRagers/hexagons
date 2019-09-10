@@ -9,15 +9,20 @@
 #define PI 3.14159265359
 using namespace std;
 
-const int numThreads = 1;
+const int numThreads = 4;
 const int width =  1280;
 const int height = 720;
-const int hexRadius = 35;
-const int stepPerMove = 5;
+const int hexRadius = 35; //35
+const int lightRadius = 2;
+const int stepPerMove = 8; //8
 const int maxNumLights = 200;
-const int spawnRate = 6;
+const int spawnRate = 8;
 const int trailLength = 18;
 const int contactRadius = 5;
+const int maxNumParticle = 3;
+const int maxParticleAge = 10;
+const bool showBackground = true;
+const int maxQuadTreeLevel = 4;
 
 int originX = width / 2;
 int originY = height / 2;
@@ -43,12 +48,12 @@ vector<sf::CircleShape> getBackground(int radius) {
 
 	//currently incorrect but makes it easier to visualize
 	int hexPerRow = ceil(width / (2 * cos(PI / 6) * radius)) + 1;
-	int hexPerCol = ceil(height / (3 * radius) * 2) + 2;
+	int hexPerCol = ceil(height / (3 * radius) * 2) + 4;
 
 	int xOffSet = 0;
 	int yOffSet = 0;
 	vector<sf::CircleShape> hexagons(hexPerCol  * hexPerRow);
-	for (int i = 0; i < hexPerCol / 2; i++) {
+	for (int i = 0; i < ceil(hexPerCol / 2); i++) {
 		if (i % 2 == 0) {
 			xOffSet = ceil(cos(PI / 6) * radius);
 		}
@@ -56,7 +61,7 @@ vector<sf::CircleShape> getBackground(int radius) {
 			xOffSet = 0;
 		}
 
-		for (int j = 0; j < hexPerRow / 2; j++) {
+		for (int j = 0; j < ceil(hexPerRow / 2); j++) {
 			hexagons.push_back(hexagon(radius, originX + xOffSet, originY + yOffSet - backgroundOffSet, backgroundHexColor));
 			hexagons.push_back(hexagon(radius, originX + xOffSet, originY - yOffSet - backgroundOffSet, backgroundHexColor));
 			hexagons.push_back(hexagon(radius, originX - xOffSet, originY + yOffSet - backgroundOffSet, backgroundHexColor));
@@ -68,6 +73,13 @@ vector<sf::CircleShape> getBackground(int radius) {
 	}
 	return hexagons;
 }
+int randInt(int min, int max) {
+	static thread_local mt19937* generator = nullptr;
+	if (!generator) generator = new mt19937(clock());// + this_thread::get_id().hash());
+	std::uniform_int_distribution<int> distribution(min, max);
+	return distribution(*generator);
+}
+
 class Light {
 	public:
 		sf::CircleShape shape;
@@ -78,6 +90,8 @@ class Light {
 		int angleId;
 		sf::Color color;
 		vector<sf::CircleShape> trail;
+		vector<sf::CircleShape> particles;
+		vector<int> particleAge;
 
 		Light(int radius, int x, int y) {
 			//color = colors[rand() % 6];
@@ -89,15 +103,22 @@ class Light {
 			angleId = rand();
 		}
 
-		void move(int direction) {
+		void setColor(sf::Color c) {
+			color = c;
+			shape.setFillColor(c);
+			shape.setOutlineColor(c);
+		}
+
+		void move() {
 			if (!moving) {
+				int temp = randInt(0, 1);
 				if (parity) {
-					angleId = (angleId + direction % 2 + 1) % 3;
+					angleId = (angleId + temp + 1) % 3;
 					angle = angles[0][angleId];
 					parity = false;
 				}
 				else {
-					angleId = (angleId + direction % 2 + 1) % 3;
+					angleId = (angleId + temp + 1) % 3;
 					angle = angles[1][angleId];
 					parity = true;
 				}
@@ -112,7 +133,7 @@ class Light {
 				moving = false;
 			}
 			
-			trail.push_back(hexagon(1, shape.getPosition().x, shape.getPosition().y, color, color));
+			trail.push_back(hexagon(1, shape.getPosition().x, shape.getPosition().y, sf::Color::Transparent, color));
 			if (trail.size() > trailLength) {
 				trail.erase(trail.begin());
 			}
@@ -123,6 +144,78 @@ class Light {
 				trail[i].setFillColor(c);
 				trail[i].setOutlineColor(c);	
 			}
+
+			if (particles.empty() || particles.size() < maxNumParticle && particleAge[particleAge.size() - 1] > maxParticleAge / maxNumParticle) {
+				particles.push_back(hexagon(1, shape.getPosition().x + randInt(-hexRadius / 3, hexRadius / 3), shape.getPosition().y + randInt(-hexRadius / 3, hexRadius / 3), sf::Color::Transparent, color));
+				particleAge.push_back(0);
+			} 
+
+			for (int i = 0; i < particleAge.size(); i++) {
+				particleAge[i]++;
+				if (particleAge[i] > maxParticleAge) {
+					particles[i].setPosition(shape.getPosition().x + randInt(-hexRadius / 3, hexRadius / 3), shape.getPosition().y + randInt(-hexRadius / 3, hexRadius / 3));
+					particleAge[i] = 0;
+				}
+			}
+		}
+
+};
+
+class QuadTree {
+	public:
+		vector<Light> lights;
+		vector<QuadTree> nodes;
+		bool leaf;
+		int startX, startY, endX, endY;
+		int level;
+		int midX;
+		int midY;
+
+		QuadTree(int lvl, int x1, int y1, int x2, int y2) {
+			level = lvl;
+			startX = x1;
+			startY = y1;
+			endX = x2;
+			endY = y2;
+			leaf = true;
+			midX = ceil((startX + endX) / 2);
+			midY = ceil((startY + endY) / 2);
+		}
+
+		void insert(Light l) {
+			if (leaf) {
+				lights.push_back(l);
+			}
+			else {
+				if (l.shape.getPosition().x > ceil((startX + endX) / 2)) {
+					if (l.shape.getPosition().y > ceil((startY + endY) / 2)) {
+						nodes[0].insert(l);
+					}
+					else {
+						nodes[1].insert(l);
+					}
+				}
+				else {
+					if (l.shape.getPosition().y <= ceil((startY + endY) / 2)) {
+						nodes[2].insert(l);
+					}
+					else {
+						nodes[3].insert(l);
+					}
+
+				}
+			}
+
+			if (level < maxQuadTreeLevel && lights.empty() && lights.size() > 3) {
+				nodes.push_back(QuadTree(level + 1, midX, startY, endX, midY));
+				nodes.push_back(QuadTree(level + 1, startX, startY, midX, midY));
+				nodes.push_back(QuadTree(level + 1, startX, midY, midX, endY));
+				nodes.push_back(QuadTree(level + 1, midX, midY, endX, endY));
+			}	
+		}
+
+		bool hasLights() {
+			return !lights.empty();
 		}
 
 };
@@ -133,14 +226,10 @@ float distance(Light l1, Light l2) {
 }
 
 std::vector<Light> lights;
-
 void moveLights(int start = 0, int end = lights.size()) {
-	static thread_local mt19937* generator = nullptr;
-	if (!generator) generator = new mt19937(clock());// + this_thread::get_id().hash());
-	std::uniform_int_distribution<int> distribution(0, 1);
 
 	for (int i = start; i < end; i++) {
-		lights[i].move(distribution(*generator));
+		lights[i].move();
 	} 
 }
 
@@ -168,11 +257,10 @@ int main() {
 		//calculations
 		//spawn new lights
 		if (tick % spawnRate == 0 && lights.size() < maxNumLights) {
-			lights.push_back(Light(1, originX, originY));
+			lights.push_back(Light(lightRadius, originX, originY));
 		}
 
 		//moves lights
-		
 		thread threads[numThreads];
 		int lightsPerThread = floor(lights.size() / numThreads);
 		for (int i = 0; i < numThreads - 1; i++) {
@@ -185,7 +273,7 @@ int main() {
 		
 		/*
 		for (int i = 0; i < lights.size(); i++) {
-			lights[i].move(rand());
+			lights[i].move();
 		} */
 	
 		//delete lights that go off screen
@@ -201,25 +289,14 @@ int main() {
 			}
 		}
 
-		//delete lights that come into contact
-		/*
-		for (int i = 0; i < lights.size(); i++) {
-			for (int j = i; j < lights.size(); j++) {
-				if (i != j) {
-					if (distance(lights[i], lights[j]) < contactRadius) {
-						lights.erase(lights.begin() + i);
-						lights.erase(lights.begin() + j - 1);
-					}
-				}
-			}
-		} */
-		
 		//draw
 		//draws background
 		
-		for (int i = 0; i < hexs.size(); i++) {
-			window.draw(hexs[i]);
-		} 
+		if (showBackground) {
+			for (int i = 0; i < hexs.size(); i++) {
+				window.draw(hexs[i]);
+			}
+		}
 
 		//draws lights and their trails
 		for (int i = 0; i < lights.size(); i++) {
@@ -227,6 +304,9 @@ int main() {
 			for (int j = 0; j < lights[i].trail.size(); j++) {
 				window.draw(lights[i].trail[j]);
 			} 
+			for (int j = 0; j < lights[i].particles.size(); j++) {
+				window.draw(lights[i].particles[j]);
+			}
 		}
 
 		window.display();
