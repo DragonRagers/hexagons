@@ -15,19 +15,17 @@ const int height = 720;
 const int hexRadius = 35; //35
 const int lightRadius = 2;
 const int stepPerMove = 8; //8
+const int maxMoves = 20;
 const int maxNumLights = 200;
-const int spawnRate = 2;
+const int spawnRate = 4;
 const int trailLength = 12;
 const int contactRadius = 3;
 const int maxNumParticle = 3;
 const int maxParticleAge = 10;
-const bool showBackground = false;
+const bool showBackground = true;
 const bool collide = false;
 const int maxLightPerTree = 3;
 const int maxQuadTreeLevel = 5;
-
-int originX = width / 2;
-int originY = height / 2;
 
 const float angles[2][3] = { PI / 6, 5 * PI / 6, 9 * PI / 6,
 							7 * PI / 6, 11 * PI / 6, 3 * PI / 6};
@@ -51,6 +49,8 @@ vector<sf::CircleShape> getBackground(int radius) {
 	//currently incorrect but makes it easier to visualize
 	int hexPerRow = ceil(width / (2 * cos(PI / 6) * radius)) + 1;
 	int hexPerCol = ceil(height / (3 * radius) * 2) + 4;
+	int originX = width / 2;
+	int originY = height / 2;
 
 	int xOffSet = 0;
 	int yOffSet = 0;
@@ -94,6 +94,7 @@ class Light {
 		sf::CircleShape shape;
 		bool moving;
 		float angle;
+		int moves;
 		int step;
 		bool parity;
 		int angleId;
@@ -110,20 +111,21 @@ class Light {
 			
 			color = sf::Color(r, g, b);
 			b += bBol ? incr : -incr;
-			if (bBol ? b == 255: b == 0) {
+			if (bBol ? b >= 255: b <= 0) {
 				g += gBol ? incr : -incr;
 				bBol = !bBol;
 			}
-			else if (gBol ? g == 255 : g == 0) {
-				r += rBol ? incr : -incr;
-				if (rBol ? r == 0 : r == 255) {
+			else if (gBol ? g >= 255 : g <= 0) {
+				if (rBol ? r >= 255 : r <= 0) {
 					rBol != rBol;
 				}
+				r += rBol ? incr : -incr;			
 			} 
 			
 			id = i;
 			shape = hexagon(radius, x, y, color, color);
 			moving = false;
+			moves = 0;
 			step = 0;
 			parity = true;
 			angleId = rand();
@@ -158,6 +160,7 @@ class Light {
 			}
 			if (step >= stepPerMove) {
 				moving = false;
+				moves++;
 			}
 			
 			trail.push_back(hexagon(1, shape.getPosition().x, shape.getPosition().y, sf::Color::Transparent, color));
@@ -196,6 +199,10 @@ class QuadTree {
 		int level;
 		int midX;
 		int midY;
+		
+		QuadTree() {
+			level = 0;
+		}
 
 		QuadTree(int lvl, int x1, int y1, int x2, int y2) {
 			level = lvl;
@@ -205,6 +212,11 @@ class QuadTree {
 			endY = y2;
 			midX = ceil((startX + endX) / 2);
 			midY = ceil((startY + endY) / 2);
+		}
+
+		void setMid() {
+			midX = (startX + endX) / 2;
+			midY = (startY + endY) / 2;
 		}
 
 		void clear() {
@@ -275,13 +287,76 @@ float distance(Light l1, Light l2) {
 
 }
 
-std::vector<Light> lights;
-void moveLights(int start = 0, int end = lights.size()) {
+class Source {
+	public:
+		int originX, originY;
+		std::vector<Light> lights;
+		QuadTree tree;
+		//QuadTree tree;
 
-	for (int i = start; i < end; i++) {
-		lights[i].move();
-	}
-}
+		Source(int x, int y) {
+			originX = x;
+			originY = y;
+			tree.startX = 0;
+			tree.startY = 0;
+			tree.endX = width;
+			tree.endY = height;
+			tree.setMid();
+		}
+
+		void update(int tick) {
+			//calculations
+			//spawn new lights
+			if (tick % spawnRate == 0) { // && lights.size() < maxNumLights) {
+				lights.push_back(Light(lightRadius, originX, originY, tick));
+			}
+
+			//moves lights
+			for (int i = 0; i < lights.size(); i++) {
+				lights[i].move();
+			}
+
+			//delete lights that go off screen
+			for (int i = 0; i < lights.size(); i++) {
+
+				int x = lights[i].shape.getPosition().x;
+				int y = lights[i].shape.getPosition().y;
+				if (x < -2 * hexRadius ||
+					x > width + 2 * hexRadius ||
+					y < -2 * hexRadius ||
+					y > height + 2 * hexRadius) {
+					lights.erase(lights.begin() + i);
+				}
+			}
+
+			//delete lights that have moved more that maxMoves
+			for (int i = 0; i < lights.size(); i++) {
+				if (lights[i].moves > maxMoves) {
+					lights.erase(lights.begin() + i);
+				}
+			}
+			
+			//deletes lights that collide
+			if (collide) {
+				tree.clear();
+				for (int i = 0; i < lights.size(); i++) {
+					tree.insert(lights[i]);
+				}
+
+				for (int i = 0; i < lights.size(); i++) {
+
+					vector<Light> nearby = tree.retrieve(lights[i]);
+
+					for (int j = 0; j < nearby.size(); j++) {
+						if (distance(lights[i], nearby[j]) < contactRadius && lights[i].id != nearby[j].id) {
+							lights.erase(lights.begin() + i);
+							break;
+						}
+					}
+				}
+			} 
+		}
+}; 
 
 int main() {
 	srand(time(NULL));
@@ -290,7 +365,9 @@ int main() {
 	window.setFramerateLimit(30);
 
 	vector<sf::CircleShape> hexs = getBackground(hexRadius);
-	QuadTree tree(0, 0, 0, width, height);
+	vector<Source> sources;
+	sources.push_back(Source(width / 2 + 10 * hexRadius * cos(PI / 6), height / 2 + 3 * hexRadius));
+	sources.push_back(Source(width / 2 - 10 * hexRadius * cos(PI / 6), height / 2 - 3 * hexRadius));
 
 	int tick = 0;
 	int timeSum = 0;
@@ -306,63 +383,9 @@ int main() {
 		window.clear(sf::Color::Black);
 
 		//calculations
-		//spawn new lights
-		if (tick % spawnRate == 0) { // && lights.size() < maxNumLights) {
-			lights.push_back(Light(lightRadius, originX, originY, tick));
+		for (int i = 0; i < sources.size(); i++) {
+			sources[i].update(tick);
 		}
-
-		//moves lights
-		thread threads[numThreads];
-		int lightsPerThread = floor(lights.size() / numThreads);
-		for (int i = 0; i < numThreads - 1; i++) {
-			threads[i] = thread(moveLights, lightsPerThread* i, lightsPerThread * (i + 1));
-		}
-		threads[numThreads - 1] = thread(moveLights, lightsPerThread * (numThreads - 1), lights.size());
-		for (int i = 0; i < numThreads; i++) {
-			threads[i].join();
-		} 
-	
-		//delete lights that go off screen
-		for (int i = 0; i < lights.size(); i++) {
-
-			int x = lights[i].shape.getPosition().x;
-			int y = lights[i].shape.getPosition().y;
-			if (x < -2 * hexRadius ||
-				x > width + 2 * hexRadius ||
-				y < -2 * hexRadius ||
-				y > height + 2 * hexRadius) {
-				lights.erase(lights.begin() + i);
-			}
-		} 
-
-		//deletes lights that collide
-		if (collide) {
-			tree.clear();
-			for (int i = 0; i < lights.size(); i++) {
-				tree.insert(lights[i]);
-			}
-
-			for (int i = 0; i < lights.size(); i++) {
-
-				vector<Light> nearby = tree.retrieve(lights[i]);
-
-				for (int j = 0; j < nearby.size(); j++) {
-					if (distance(lights[i], nearby[j]) < contactRadius && lights[i].id != nearby[j].id) {
-						lights.erase(lights.begin() + i);
-						break;
-					}
-				}
-			}
-		}
-		
-		/*
-		for (int i = 0; i < lights.size(); i++) {
-			for (int j = i; j < lights.size(); j++) {
-				if (i != j && distance(lights[i], lights[j]) < contactRadius) {
-					lights.erase(lights.begin() + i); 
-				}
-			}
-		} */
 
 		//draw
 		//draws background
@@ -373,17 +396,20 @@ int main() {
 			}
 		}
 
+		
 		//draws lights and their trails
-		for (int i = 0; i < lights.size(); i++) {
-			window.draw(lights[i].shape);
-			for (int j = 0; j < lights[i].trail.size(); j++) {
-				window.draw(lights[i].trail[j]);
-			} 
-			for (int j = 0; j < lights[i].particles.size(); j++) {
-				window.draw(lights[i].particles[j]);
+		for (int i = 0; i < sources.size(); i++) {
+			for (int j = 0; j < sources[i].lights.size(); j++) {
+				window.draw(sources[i].lights[j].shape);
+				for (int k = 0; k < sources[i].lights[j].trail.size(); k++) {
+					window.draw(sources[i].lights[j].trail[k]);
+				}
+				for (int k = 0; k < sources[i].lights[j].particles.size(); k++) {
+					window.draw(sources[i].lights[j].particles[k]);
+				}
 			}
 		}
-
+		
 		window.display();
 
 		/*
