@@ -10,18 +10,19 @@
 using namespace std;
 
 const int numThreads = 4;
-const int width =  1280;
+const int width = 1280;
 const int height = 720;
 const int hexRadius = 35; //35
 const int lightRadius = 2;
 const int stepPerMove = 8; //8
 const int maxNumLights = 200;
-const int spawnRate = 6;
+const int spawnRate = 2;
 const int trailLength = 12;
 const int contactRadius = 3;
 const int maxNumParticle = 3;
 const int maxParticleAge = 10;
-const bool showBackground = true;
+const bool showBackground = false;
+const bool collide = false;
 const int maxLightPerTree = 3;
 const int maxQuadTreeLevel = 5;
 
@@ -81,6 +82,13 @@ int randInt(int min, int max) {
 	return distribution(*generator);
 }
 
+int r = 0;
+bool rBol = true;
+int g = 0;
+bool gBol = true;
+int b = 0;
+bool bBol = true;
+int incr = 15;
 class Light {
 	public:
 		sf::CircleShape shape;
@@ -97,8 +105,23 @@ class Light {
 
 		Light(int radius, int x, int y, int i) {
 			//color = colors[rand() % 6];
+			//color = sf::Color(rand() % 255, rand() % 255, rand() % 255);
+			//color = sf::Color(255, 255, 255);
+			
+			color = sf::Color(r, g, b);
+			b += bBol ? incr : -incr;
+			if (bBol ? b == 255: b == 0) {
+				g += gBol ? incr : -incr;
+				bBol = !bBol;
+			}
+			else if (gBol ? g == 255 : g == 0) {
+				r += rBol ? incr : -incr;
+				if (rBol ? r == 0 : r == 255) {
+					rBol != rBol;
+				}
+			} 
+			
 			id = i;
-			color = sf::Color(rand() % 255, rand() % 255, rand() % 255);
 			shape = hexagon(radius, x, y, color, color);
 			moving = false;
 			step = 0;
@@ -277,7 +300,7 @@ int main() {
 		sf::Event event;
 		while (window.pollEvent(event))
 		{
-			if (event.type == sf::Event::Closed)
+			if (sf::Keyboard::isKeyPressed(sf::Keyboard::Q) || event.type == sf::Event::Closed)
 				window.close();
 		}
 		window.clear(sf::Color::Black);
@@ -313,22 +336,24 @@ int main() {
 		} 
 
 		//deletes lights that collide
-		tree.clear();
-		for (int i = 0; i < lights.size(); i++) {
-			tree.insert(lights[i]);
-		}
-		
-		for (int i = 0; i < lights.size(); i++) {
-			
-			vector<Light> nearby = tree.retrieve(lights[i]);
-			
-			for (int j = 0; j < nearby.size(); j++) {
-				if (distance(lights[i], nearby[j]) < contactRadius && lights[i].id != nearby[j].id) {
-					lights.erase(lights.begin() + i);
-					break;
+		if (collide) {
+			tree.clear();
+			for (int i = 0; i < lights.size(); i++) {
+				tree.insert(lights[i]);
+			}
+
+			for (int i = 0; i < lights.size(); i++) {
+
+				vector<Light> nearby = tree.retrieve(lights[i]);
+
+				for (int j = 0; j < nearby.size(); j++) {
+					if (distance(lights[i], nearby[j]) < contactRadius && lights[i].id != nearby[j].id) {
+						lights.erase(lights.begin() + i);
+						break;
+					}
 				}
-			} 
-		} 
+			}
+		}
 		
 		/*
 		for (int i = 0; i < lights.size(); i++) {
@@ -360,6 +385,14 @@ int main() {
 		}
 
 		window.display();
+
+		/*
+		sf::Texture texture;
+		texture.create(width, height);
+		texture.update(window);
+		texture.copyToImage().saveToFile("C:\\Users\\Connor\\Pictures\\Image1.png");
+		*/
+
 		tick++;
 		std::chrono::duration<double> elapsed = std::chrono::high_resolution_clock::now() - startTime;
 
