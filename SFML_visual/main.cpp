@@ -15,14 +15,14 @@ const int height = 720;
 const int hexRadius = 35; //35
 const int lightRadius = 2;
 const int stepPerMove = 8; //8
-const int maxMoves = 20;
-const int maxNumLights = 200;
-const int spawnRate = 4;
-const int trailLength = 12;
+const int maxMoves = 30;
+const int maxNumLights = 500;
+const int spawnRate = 1;
+const int trailLength = 10;
 const int contactRadius = 3;
-const int maxNumParticle = 3;
+const int maxNumParticle = 2;
 const int maxParticleAge = 10;
-const bool showBackground = true;
+const bool showBackground = false;
 const bool collide = false;
 const int maxLightPerTree = 3;
 const int maxQuadTreeLevel = 5;
@@ -88,7 +88,8 @@ int g = 0;
 bool gBol = true;
 int b = 0;
 bool bBol = true;
-int incr = 15;
+int incr = 5;
+int numLight = 0;
 class Light {
 	public:
 		sf::CircleShape shape;
@@ -119,7 +120,7 @@ class Light {
 				if (rBol ? r >= 255 : r <= 0) {
 					rBol != rBol;
 				}
-				r += rBol ? incr : -incr;			
+				r += rBol ? incr : -incr;				
 			} 
 			
 			id = i;
@@ -129,6 +130,7 @@ class Light {
 			step = 0;
 			parity = true;
 			angleId = rand();
+			numLight++;
 		}
 
 		void setColor(sf::Color c) {
@@ -200,7 +202,7 @@ class QuadTree {
 		int midX;
 		int midY;
 		
-		QuadTree() {
+		QuadTree() { //should only be called when other parameters are set before use
 			level = 0;
 		}
 
@@ -292,7 +294,6 @@ class Source {
 		int originX, originY;
 		std::vector<Light> lights;
 		QuadTree tree;
-		//QuadTree tree;
 
 		Source(int x, int y) {
 			originX = x;
@@ -307,7 +308,7 @@ class Source {
 		void update(int tick) {
 			//calculations
 			//spawn new lights
-			if (tick % spawnRate == 0) { // && lights.size() < maxNumLights) {
+			if (tick % spawnRate == 0 && numLight < maxNumLights) {
 				lights.push_back(Light(lightRadius, originX, originY, tick));
 			}
 
@@ -326,6 +327,7 @@ class Source {
 					y < -2 * hexRadius ||
 					y > height + 2 * hexRadius) {
 					lights.erase(lights.begin() + i);
+					numLight--;
 				}
 			}
 
@@ -333,6 +335,7 @@ class Source {
 			for (int i = 0; i < lights.size(); i++) {
 				if (lights[i].moves > maxMoves) {
 					lights.erase(lights.begin() + i);
+					numLight--;
 				}
 			}
 			
@@ -350,6 +353,7 @@ class Source {
 					for (int j = 0; j < nearby.size(); j++) {
 						if (distance(lights[i], nearby[j]) < contactRadius && lights[i].id != nearby[j].id) {
 							lights.erase(lights.begin() + i);
+							numLight--;
 							break;
 						}
 					}
@@ -357,6 +361,10 @@ class Source {
 			} 
 		}
 }; 
+
+void sourceUpdate(Source& s, int tick) {
+	s.update(tick);
+}
 
 int main() {
 	srand(time(NULL));
@@ -380,50 +388,46 @@ int main() {
 			if (sf::Keyboard::isKeyPressed(sf::Keyboard::Q) || event.type == sf::Event::Closed)
 				window.close();
 		}
-		window.clear(sf::Color::Black);
 
 		//calculations
+		std::vector<std::thread> threads;
 		for (int i = 0; i < sources.size(); i++) {
-			sources[i].update(tick);
+			threads.push_back(std::thread(sourceUpdate, std::ref(sources[i]), tick));
 		}
+		for (int i = 0; i < sources.size(); i++) {
+			threads[i].join();
+		} 
 
 		//draw
 		//draws background
-		
+		window.clear(sf::Color::Black);
 		if (showBackground) {
 			for (int i = 0; i < hexs.size(); i++) {
 				window.draw(hexs[i]);
 			}
 		}
-
 		
-		//draws lights and their trails
+		//draws lights and their trails	
 		for (int i = 0; i < sources.size(); i++) {
 			for (int j = 0; j < sources[i].lights.size(); j++) {
 				window.draw(sources[i].lights[j].shape);
 				for (int k = 0; k < sources[i].lights[j].trail.size(); k++) {
 					window.draw(sources[i].lights[j].trail[k]);
-				}
+				} 
 				for (int k = 0; k < sources[i].lights[j].particles.size(); k++) {
 					window.draw(sources[i].lights[j].particles[k]);
-				}
+				} 
 			}
-		}
+		} 
+		window.display(); 
 		
-		window.display();
-
-		/*
-		sf::Texture texture;
-		texture.create(width, height);
-		texture.update(window);
-		texture.copyToImage().saveToFile("C:\\Users\\Connor\\Pictures\\Image1.png");
-		*/
 
 		tick++;
 		std::chrono::duration<double> elapsed = std::chrono::high_resolution_clock::now() - startTime;
 
 		timeSum += round(elapsed.count() * 1000);
-		cout << "\nTick " << tick << ": " << round(elapsed.count() * 1000) << " (ms), Average: " << timeSum / tick << " (ms)";
+		printf("\nTick: %3d: %3.0f (ms), Average: %3.0f (ms), Lights: %3d / %3d", tick, round(elapsed.count() * 1000), round(timeSum / tick), numLight, maxNumLights);
+		//cout << "\nTick " << tick << ": " << round(elapsed.count() * 1000) << " (ms), Average: " << timeSum / tick << " (ms)";
 	}
 	return 0;
 }
